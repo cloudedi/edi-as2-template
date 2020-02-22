@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:AS2="http://www.mulesoft.org/schema/mule/AS2"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/AS2 http://www.mulesoft.org/schema/mule/AS2/current/mule-AS2.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<AS2:config name="AS2_Config" doc:name="AS2 Config" doc:id="4fff6d70-fc15-4dee-9b0b-06833f6a2d16" serverPort="8000" from="PartnerA" to="MyCompany" gateway="http://localhost:10080" email="edi@cloudedi.cn" keyStorePath="" keyStorePassword="" messageType="application/json" encrypt="3des" sign="sha1" receiptDeliveryOption="http://localhost:8000"/>
+	<flow name="接收EDI数据" doc:id="88d51e59-0614-4d0b-bb0f-7f6d36a82615" >
+		<AS2:receiver doc:name="AS2接收" doc:id="929a4a74-363e-4afa-abd6-2c576c2577e4" config-ref="AS2_Config"/>
+		<choice doc:name="Choice" doc:id="9e859db4-4dad-4d5c-9daa-3c1d834c9610" >
+			<when expression="#[attributes.mdn==null]">
+				<logger level="INFO" doc:name="Logger" doc:id="67d0b746-66bf-4ef8-80f0-854b77bb3f57" message='#[attributes["Message-Id"]]' />
+				<file:write doc:name="Write" doc:id="5155fdfc-ea5c-4fd2-bf60-1ffaaae70602" path='#[["/tmp/ediout/msg",randomInt(20000),".txt"] joinBy ""]' />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="df80a116-f20a-4879-97e2-8a915aa63b5f" message="收到MDN"/>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="发送EDI数据" doc:id="db71210f-0d41-4f78-8fdf-726f2af3f239" >
+		<file:listener doc:name="On New or Updated File" doc:id="1330ef43-42fb-49db-b92a-223ba0263a6b"  directory="/tmp/ediin" recursive="false" moveToDirectory="/tmp/sent" autoDelete="true">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</file:listener>
+		<try doc:name="Try" doc:id="711f1471-1269-43fe-8d2b-48c1f9f55333" >
+			<AS2:send-message doc:name="发送" doc:id="2584055a-ded3-4539-9511-b3f71e7cec61" config-ref="AS2_Config"  data="#[payload]"/>
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="a1a521b0-686b-460c-a9f7-8bb01d1b27f4" >
+					<logger level="INFO" doc:name="Logger" doc:id="aa30564e-1312-440d-b9ba-34caeb47a0a2" message="payload"/>
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<logger level="INFO" doc:name="显示MDN信息" doc:id="e303fd0e-bd3b-4ea8-9189-36f2d1133441" message="#[attributes.mdn.disposition]"/>
+	</flow>
+</mule>
